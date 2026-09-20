@@ -1,0 +1,54 @@
+name: release drillion validator
+
+on:
+  push:
+    tags:
+      - "v*-drillion.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.8"
+          cache: false
+      - name: test the pinned source
+        run: go test -race ./... -count=1
+      - name: build verified static archives
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          mkdir -p dist
+          build() {
+            os="$1" arch="$2" extension="$3" archive="$4"
+            binary="kubeconform$extension"
+            CGO_ENABLED=0 GOFLAGS=-mod=vendor GOOS="$os" GOARCH="$arch" \
+              go build -buildvcs=false -trimpath -tags=netgo -a \
+              -ldflags "-extldflags '-static' -X main.version=$VERSION" \
+              -o "$binary" ./cmd/kubeconform
+            go version "$binary" | grep 'go1.26.8'
+            if [ "$archive" = tar.gz ]; then
+              tar -czf "dist/kubeconform-$os-$arch.tar.gz" "$binary"
+            else
+              zip -q "dist/kubeconform-$os-$arch.zip" "$binary"
+            fi
+            rm "$binary"
+          }
+          build linux amd64 "" tar.gz
+          build linux arm64 "" tar.gz
+          build darwin amd64 "" tar.gz
+          build darwin arm64 "" tar.gz
+          build windows amd64 .exe zip
+          (cd dist && sha256sum kubeconform-* > CHECKSUMS)
+      - name: publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --notes "Kubeconform v0.8.0 rebuilt with Go 1.26.8 for Drillion."
