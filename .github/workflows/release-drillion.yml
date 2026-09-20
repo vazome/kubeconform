@@ -47,7 +47,7 @@ jobs:
           build darwin amd64 "" tar.gz
           build darwin arm64 "" tar.gz
           build windows amd64 .exe zip
-          sha256sum dist/* > dist/CHECKSUMS
+          (cd dist && sha256sum kubeconform-* > CHECKSUMS)
       - name: publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
