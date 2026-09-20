@@ -39,7 +39,7 @@ jobs:
     needs:
       - kubeconform-test
       - openapi2jsonschema-go-test
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-drillion.')
     steps:
       - name: checkout
         uses: actions/checkout@v4
